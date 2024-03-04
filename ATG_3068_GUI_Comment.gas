@@ -1,0 +1,89 @@
+Program.Sub.ScreenSU.Start
+Program.Sub.ScreenSU.End
+
+Program.Sub.Preflight.Start
+
+Program.Sub.Preflight.End
+
+Program.Sub.Main.Start
+'Dumur Require comments on sequences 998500 and 996000
+'Hook 15880
+'7/33/10 modification: Hook 25620, 15840
+'This version interacts with ATG_3068_COMMENT_WC.gas to check the workcenters that require comments as well
+
+'Modification on 7/22/10 by SMC:  The functionality of the Comments box has changed.  Script added to Hook 25620 and 15840 to address the issue
+V.Local.sFile.Declare(String)
+V.Local.sOrder.Declare(String)
+V.Local.bExists.Declare(Boolean)
+
+F.Intrinsic.String.Concat(V.Caller.TempDir,"\CommentsOrder",V.Caller.Terminal,V.Local.sFile)
+
+F.intrinsic.control.if(V.caller.hook,=,15840)
+	F.Intrinsic.File.Exists(V.Local.sFile,V.Local.bExists)
+	F.Intrinsic.Control.If(V.Local.bExists,=,True)
+		F.Intrinsic.File.DeleteFile(V.Local.sFile)
+	F.Intrinsic.Control.EndIf
+
+F.Intrinsic.Control.elseIf(V.Caller.Hook,=,25620)
+	F.Intrinsic.Control.If(V.Passed.000001,<>,"")
+		F.Intrinsic.String.Concat(V.Passed.000004,"*!*",V.Passed.000005,V.Local.sOrder)
+		F.Intrinsic.File.String2File(V.Local.sFile,V.Local.sOrder)
+	F.Intrinsic.Control.EndIf
+
+F.Intrinsic.Control.ElseIf(V.Caller.Hook,=,15880)
+	V.Local.bContinue.Declare(Boolean)
+	V.Local.sStatus.Declare(String)
+	V.Local.sMsg.Declare(String)
+	V.Local.sWC.declare(String)
+	V.Local.sQuery.Declare(String)
+
+	V.Local.bContinue.Set(False)
+	F.Intrinsic.Control.SelectCase(V.Passed.000005)
+		F.Intrinsic.Control.Case("998500")
+			V.Local.bContinue.Set(True)
+			F.Intrinsic.String.Concat("You must leave a comment when applying labor to sequence ",V.Passed.000005,"!",V.Local.sMsg)
+		F.Intrinsic.Control.Case("996000")
+			V.Local.bContinue.Set(True)
+			F.Intrinsic.String.Concat("You must leave a comment when applying labor to sequence ",V.Passed.000005,"!",V.Local.sMsg)
+		F.Intrinsic.Control.CaseElse
+			F.Intrinsic.Control.If(V.Passed.000010.Trim,<>,"")
+				F.ODBC.Connection!conx.OpenConnection(V.Ambient.PDSN,V.Ambient.PUser,V.Ambient.PPass)
+
+				F.Intrinsic.String.Concat("SELECT * FROM ATG_3068_COMMENT_WC WHERE WORKCENTER='",V.Passed.000010,"'",V.Local.sQuery)
+				F.ODBC.Connection!conx.OpenRecordsetRO("rstWC",V.Local.sQuery)
+				F.Intrinsic.Control.If(V.ODBC.conx!rstWC.EOF,<>,True)
+					V.Local.bContinue.Set(True)
+					F.Intrinsic.String.Concat("You must leave a comment when applying labor to workcenter ",V.Passed.000010,"!",V.Local.sMsg)
+				F.Intrinsic.Control.EndIf
+				F.ODBC.conx!rstWC.Close
+				
+				F.ODBC.Connection!conx.Close
+			F.Intrinsic.Control.EndIf
+	F.Intrinsic.Control.EndSelect
+
+	F.Intrinsic.Control.If(V.Local.bContinue,=,True)
+		V.Local.bContinue.Set(False)
+		F.Intrinsic.File.Exists(V.Local.sFile,V.Local.bExists)
+		F.Intrinsic.Control.If(V.Local.bExists,=,True)
+			F.Intrinsic.File.File2String(V.Local.sFile,V.Local.sOrder)
+			F.Intrinsic.String.Split(V.Local.sOrder,"*!*",V.Local.sOrder)
+
+			F.Intrinsic.Control.If(V.Local.sOrder(0),=,V.Passed.000004)
+				F.Intrinsic.Control.If(V.Local.sOrder(1),=,V.Passed.000005)
+					V.Local.bContinue.Set(True)
+				F.Intrinsic.Control.EndIf
+			F.Intrinsic.Control.EndIf
+		F.Intrinsic.Control.EndIf
+
+		F.Intrinsic.Control.If(V.Local.bContinue,<>,True)
+			V.Passed.777777.Set("1")
+			F.Intrinsic.UI.Msgbox(V.Local.sMsg,"Comment Required")
+		F.Intrinsic.Control.EndIf
+	F.Intrinsic.Control.EndIf
+
+F.Intrinsic.Control.EndIf
+
+
+Program.Sub.Main.End
+
+
